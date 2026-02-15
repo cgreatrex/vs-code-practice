@@ -4,7 +4,7 @@
 # 1. Variables and Data Types
 print("=== Variables and Data Types ===")
 name = "Alice"
-age = 25
+age = 30
 height = 5.7
 is_student = True
 
