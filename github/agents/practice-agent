@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""
+GitHub Repository Structure Agent
+Helps analyze and organize your GitHub repository structure
+"""
+
+import os
+import json
+from pathlib import Path
+from collections import defaultdict
+
+
+class RepoStructureAgent:
+    """Agent for analyzing GitHub repository organization"""
+
+    def __init__(self, repo_path="."):
+        self.repo_path = Path(repo_path)
+        self.ignore_patterns = {
+            '.git', 'node_modules', '.venv', '__pycache__', 
+            '.pytest_cache', 'dist', 'build', '.DS_Store'
+        }
+        self.file_categories = defaultdict(list)
+
+    def analyze(self):
+        """Scan and categorize all files in the repo"""
+        print(f"🔍 Analyzing repository: {self.repo_path}")
+        
+        for root, dirs, files in os.walk(self.repo_path):
+            # Skip ignored directories
+            dirs[:] = [d for d in dirs if d not in self.ignore_patterns]
+            
+            for file in files:
+                filepath = Path(root) / file
+                self._categorize_file(filepath)
+        
+        report = self._generate_report()
+        self._print_report(report)
+        return report
+
+    def _categorize_file(self, filepath):
+        """Categorize a file by its type"""
+        suffix = filepath.suffix.lower()
+        name = filepath.name
+        
+        if suffix == '.py':
+            category = '🐍 Python'
+        elif suffix in ['.js', '.ts']:
+            category = '📜 JavaScript/TypeScript'
+        elif suffix in ['.md', '.txt', '.rst']:
+            category = '📚 Documentation'
+        elif name in ['package.json', '.gitignore', 'requirements.txt', 'setup.py', 'Makefile']:
+            category = '⚙️  Config/Build'
+        elif suffix in ['.png', '.jpg', '.svg', '.ico']:
+            category = '🖼️  Images'
+        else:
+            category = '📦 Other'
+        
+        self.file_categories[category].append(str(filepath.relative_to(self.repo_path)))
+
+    def _generate_report(self):
+        """Create the analysis report"""
+        return {
+            'total_files': sum(len(v) for v in self.file_categories.values()),
+            'categories': dict(self.file_categories),
+            'suggestions': self._get_suggestions()
+        }
+
+    def _print_report(self, report):
+        """Print a formatted report"""
+        print("\n" + "="*50)
+        print("📊 REPO STRUCTURE ANALYSIS")
+        print("="*50)
+        print(f"\n📈 Total Files Found: {report['total_files']}\n")
+        
+        print("📂 Files by Category:")
+        for category, files in sorted(report['categories'].items()):
+            print(f"  {category}: {len(files)} files")
+        
+        print("\n💡 Suggestions:")
+        for suggestion in report['suggestions']:
+            print(f"  • {suggestion}")
+        print("\n" + "="*50 + "\n")
+
+    def _get_suggestions(self):
+        """Generate improvement suggestions based on analysis"""
+        suggestions = []
+        
+        python_files = len(self.file_categories.get('🐍 Python', []))
+        if python_files > 10:
+            suggestions.append("Consider creating a 'src/' directory for Python files")
+        
+        docs = len(self.file_categories.get('📚 Documentation', []))
+        if docs > 3:
+            suggestions.append("Consider organizing docs into a 'docs/' directory")
+        
+        if not any('test' in f.lower() for files in self.file_categories.values() for f in files):
+            suggestions.append("Add a 'tests/' directory with test files")
+        
+        return suggestions or ["✅ Repository structure looks good!"]
+
+
+if __name__ == "__main__":
+    agent = RepoStructureAgent()
+    agent.analyze()
