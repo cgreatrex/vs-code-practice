@@ -6,8 +6,12 @@ Helps analyze and organize your GitHub repository structure
 
 import os
 import json
+import sys
+import tempfile
+import subprocess
 from pathlib import Path
 from collections import defaultdict
+from urllib.parse import urlparse
 
 
 class RepoStructureAgent:
@@ -20,6 +24,42 @@ class RepoStructureAgent:
             '.pytest_cache', 'dist', 'build', '.DS_Store'
         }
         self.file_categories = defaultdict(list)
+        self.is_remote = False
+
+    @staticmethod
+    def is_github_url(path):
+        """Check if path is a GitHub URL"""
+        return path.startswith('http') and 'github.com' in path
+
+    @staticmethod
+    def clone_github_repo(github_url):
+        """Clone a GitHub repo to a temporary directory"""
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                print(f"📥 Cloning repository: {github_url}")
+                subprocess.run(
+                    ['git', 'clone', '--depth', '1', github_url, tmpdir],
+                    capture_output=True,
+                    check=True,
+                    timeout=60
+                )
+                return tmpdir
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Failed to clone repository: {e.stderr.decode()}")
+            return None
+        except Exception as e:
+            print(f"❌ Error cloning repository: {e}")
+            return None
+
+    @classmethod
+    def from_github_url(cls, github_url):
+        """Create an agent from a GitHub URL"""
+        tmpdir = cls.clone_github_repo(github_url)
+        if tmpdir:
+            agent = cls(tmpdir)
+            agent.is_remote = True
+            return agent
+        return None
 
     def analyze(self):
         """Scan and categorize all files in the repo"""
@@ -100,5 +140,21 @@ class RepoStructureAgent:
 
 
 if __name__ == "__main__":
-    agent = RepoStructureAgent()
-    agent.analyze()
+    repo_path = "."
+    
+    # Check for command-line arguments
+    if len(sys.argv) > 1:
+        repo_path = sys.argv[1]
+    
+    # Check if it's a GitHub URL
+    if RepoStructureAgent.is_github_url(repo_path):
+        print(f"🌐 Detected GitHub URL: {repo_path}")
+        agent = RepoStructureAgent.from_github_url(repo_path)
+        if agent:
+            agent.analyze()
+        else:
+            print("❌ Failed to analyze remote repository")
+            sys.exit(1)
+    else:
+        agent = RepoStructureAgent(repo_path)
+        agent.analyze()
